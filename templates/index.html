@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="stats">
+  <div class="stat"><div class="label">Subjects</div><div class="value">{{ stats.subjects }}</div></div>
+  <div class="stat"><div class="label">Upcoming exams</div><div class="value">{{ stats.upcoming_exams }}</div></div>
+  <div class="stat"><div class="label">Sessions on {{ view_date }}</div><div class="value">{{ stats.sessions_today }}</div></div>
+  <div class="stat"><div class="label">Goals done on {{ view_date }}</div><div class="value">{{ stats.goals_done_today }}</div></div>
+</div>
+
+<div class="card">
+  <h2>Today: {{ view_date }} <span class="help">(change the date below to see another day)</span></h2>
+  <div class="form-row">
+    <div class="field">
+      <h3>Schedule &mdash; {{ total_minutes }} min total</h3>
+      {% if sessions %}
+      <table>
+        <thead><tr><th>Time</th><th>Subject</th><th>Topic</th><th class="num">Minutes</th></tr></thead>
+        <tbody>
+          {% for s in sessions %}
+          <tr><td>{{ s.start }}&ndash;{{ s.end }}</td><td>{{ s.subject }}</td><td>{{ s.topic or '&ndash;' }}</td><td class="num">{{ s.duration_minutes }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No study sessions scheduled for {{ view_date }}.</p>
+      {% endif %}
+    </div>
+    <div class="field">
+      <h3>Goals</h3>
+      {% if goals %}
+      <table>
+        <thead><tr><th>Goal</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for g in goals %}
+          <tr class="{{ 'done' if g.done else '' }}">
+            <td>{{ g.text }}</td>
+            <td><span class="badge {{ 'green' if g.done else 'amber' }}">{{ 'Done' if g.done else 'Pending' }}</span></td>
+            <td>
+              {% if not g.done %}
+              <form class="inline" method="post" action="{{ url_for('complete_goal', goal_id=g.id) }}">
+                <input type="hidden" name="date" value="{{ view_date }}">
+                <button class="btn small" type="submit">Complete</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No goals for {{ view_date }}.</p>
+      {% endif %}
+    </div>
+  </div>
+  <form method="get" action="{{ url_for('index') }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="view-date">Show schedule &amp; goals for date</label>
+        <input type="date" id="view-date" name="date" value="{{ view_date }}">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn secondary" type="submit">Show date</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Add a subject</h2>
+  <form method="post" action="{{ url_for('add_subject') }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="subject-name">Subject</label>
+        <input type="text" id="subject-name" name="name" placeholder="e.g. Mathematics" required>
+      </div>
+      <div class="field">
+        <label for="subject-desc">Description</label>
+        <input type="text" id="subject-desc" name="description" placeholder="Optional description">
+      </div>
+    </div>
+    <button class="btn" type="submit">Add subject</button>
+  </form>
+  {% if subjects %}
+  <table style="margin-top: 12px;">
+    <thead><tr><th>ID</th><th>Subject</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for s in subjects %}
+      <tr><td>{{ s.id }}</td><td><strong>{{ s.name }}</strong></td><td>{{ s.description or '&ndash;' }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No subjects yet. Add one above.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Add an exam</h2>
+  <form method="post" action="{{ url_for('add_exam') }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="exam-subject">Subject</label>
+        <select id="exam-subject" name="subject">
+          {% for s in subjects %}
+          <option value="{{ s.name }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="exam-date">Exam date</label>
+        <input type="date" id="exam-date" name="date" required>
+      </div>
+      <div class="field">
+        <label for="exam-title">Title</label>
+        <input type="text" id="exam-title" name="title" placeholder="e.g. Midterm">
+      </div>
+    </div>
+    <button class="btn" type="submit">Add exam</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Exams</h2>
+  <div class="btn-row" style="margin-bottom: 12px;">
+    <a class="btn {{ 'secondary' if exam_filter != 'upcoming' else '' }}" href="{{ url_for('index', exams='upcoming', date=view_date) }}">Upcoming</a>
+    <a class="btn {{ 'secondary' if exam_filter != 'all' else '' }}" href="{{ url_for('index', exams='all', date=view_date) }}">All</a>
+    <span style="flex: 1;"></span>
+    <a class="btn secondary" href="{{ url_for('index', exams='upcoming', days=7, date=view_date) }}">Next 7 days</a>
+    <a class="btn secondary" href="{{ url_for('index', exams='upcoming', days=30, date=view_date) }}">Next 30 days</a>
+  </div>
+  {% if exams %}
+  <table>
+    <thead><tr><th>Date</th><th>Subject</th><th>Title</th><th>Days left</th></tr></thead>
+    <tbody>
+      {% for e in exams %}
+      <tr>
+        <td>{{ e.date }}</td>
+        <td><strong>{{ e.subject }}</strong></td>
+        <td>{{ e.title }}</td>
+        <td><span class="badge {{ e.badge_class }}">{{ e.badge_label }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No exams in this view. Add one above.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Add a study session</h2>
+  <form method="post" action="{{ url_for('add_session') }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="session-subject">Subject</label>
+        <select id="session-subject" name="subject">
+          {% for s in subjects %}
+          <option value="{{ s.name }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="session-date">Date</label>
+        <input type="date" id="session-date" name="date" value="{{ view_date }}" required>
+      </div>
+      <div class="field">
+        <label for="session-start">Start (HH:MM)</label>
+        <input type="time" id="session-start" name="start">
+      </div>
+      <div class="field">
+        <label for="session-end">End (HH:MM)</label>
+        <input type="time" id="session-end" name="end">
+      </div>
+      <div class="field">
+        <label for="session-duration">Duration (minutes)</label>
+        <input type="number" id="session-duration" name="duration" min="1" placeholder="e.g. 45">
+        <div class="help">Use start + end, or duration (start defaults to 09:00).</div>
+      </div>
+      <div class="field">
+        <label for="session-topic">Topic</label>
+        <input type="text" id="session-topic" name="topic" placeholder="e.g. Integration">
+      </div>
+    </div>
+    <button class="btn" type="submit">Add session</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Add a daily goal</h2>
+  <form method="post" action="{{ url_for('add_goal') }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="goal-date">Date</label>
+        <input type="date" id="goal-date" name="date" value="{{ view_date }}" required>
+      </div>
+      <div class="field">
+        <label for="goal-text">Goal</label>
+        <input type="text" id="goal-text" name="text" placeholder="e.g. Finish 20 integration problems" required>
+      </div>
+    </div>
+    <button class="btn" type="submit">Add goal</button>
+  </form>
+</div>
+{% endblock %}
